@@ -1,4 +1,4 @@
-package org.shkr.wikiclassifier.reader
+package org.shkr.wikiclassifier.model
 
 case class ArticleText(sentences: IndexedSeq[IndexedSeq[String]])
 
