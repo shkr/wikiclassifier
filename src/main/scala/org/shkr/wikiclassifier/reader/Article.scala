@@ -57,11 +57,11 @@ object Article {
     val introduction: ArticleText = {
 
       val text = p.findAllMatchIn(html).map(subStringMatch => subStringMatch.group(1))
-        .map(text => cleanText(text)).mkString.toLowerCase
+        .map(text => cleanText(text)).mkString
 
       ArticleText(sentenceSplitter(text)
               .map(tokenizer)
-              .map(wordSeq => wordSeq.filter(w => w.length>0 && w.exists(letters.contains))))
+              .map(wordSeq => wordSeq.map(_.toLowerCase).filter(w => w.length>0 && w.exists(letters.contains))))
     }
 
     val contentTypes: List[String] = {
