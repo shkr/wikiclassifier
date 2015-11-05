@@ -1,8 +1,11 @@
 package org.shkr.wikiclassifier.classifier
 
+import java.io.File
 import java.nio.file.{Files, Paths}
+import akka.stream.io.SynchronousFileSink
 import akka.stream.scaladsl._
-import org.shkr.wikiclassifier.model.{NotDisease, Disease, Category, Article}
+import akka.util.ByteString
+import org.shkr.wikiclassifier.model._
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -24,25 +27,58 @@ object Training {
     })
   }
 
-  val wordSetInSentence: Flow[Article, (Category, Set[String]), Unit]={
-    Flow[Article]
-      .mapAsyncUnordered[(Category, IndexedSeq[IndexedSeq[String]])](parallelism)(article => Future {
-        (article.label, article.introduction.sentences)
-      })
-      .mapConcat[(Category, Set[String])](e => e._2.map(sentence => (e._1, sentence.toSet)).toList)
-  }
-
-  val sinkWordProbabilityOverSentences: Sink[(Category, Set[String]), Future[BinaryClassifier]] =
-    Sink.fold(new BinaryClassifier(Disease, NotDisease))(
-      (acc: BinaryClassifier, item: (Category, Set[String])) => {
-        acc.observation(item._1, item._2)
+  val sinkWordProbabilityOverSentences: Sink[Article, Future[NaiveBayesWikiClassifier]] =
+    Sink.fold(new NaiveBayesWikiClassifier(Disease, NotDisease))(
+      (acc: NaiveBayesWikiClassifier, article: Article) => {
+        acc.observation(article)
         acc
       }
     )
 
-  def wordProbability(directoryPath: String*): Future[BinaryClassifier] = article(directoryPath:_*)
-    .via(wordSetInSentence)
+  def classifyArticle(naiveBayesClassifier: NaiveBayesWikiClassifier): Flow[Article, TwoCategoryResult, Unit] =
+    Flow[Article]
+      .mapAsyncUnordered[TwoCategoryResult](parallelism)(
+      article => {
+        Future { naiveBayesClassifier.classifyArticle(article) }
+      }
+    )
+
+  def wordProbability(directoryPath: String*): Future[NaiveBayesWikiClassifier] =
+    article(directoryPath:_*)
     .runWith(sinkWordProbabilityOverSentences)
+
+  def calculateError(naiveBayesClassifier: NaiveBayesWikiClassifier, dirPath: String*) =
+    FlowGraph.closed(sinkErrorTable, sinkWriteResult)((_, _)) { implicit builder =>
+      (errorTable, resultFile) => {
+
+        import FlowGraph.Implicits._
+
+        val results = article(positivePath, negativePath).via(classifyArticle(naiveBayesClassifier))
+        val broadcast = builder.add(Broadcast[TwoCategoryResult](2))
+
+        results ~> broadcast.in
+        broadcast.out(0) ~> errorTable.inlet
+        broadcast.out(1) ~> resultFile.inlet
+      }
+  }
+
+  val sinkErrorTable: Sink[TwoCategoryResult, Future[StatisticalErrorTable]] = Sink.fold[StatisticalErrorTable, TwoCategoryResult](new StatisticalErrorTable(Disease, NotDisease))(
+    (errorTable, twoCategoryResult) => {
+      errorTable.update(twoCategoryResult.article.category, twoCategoryResult.classification)
+      errorTable
+    }
+  )
+
+  val sinkWriteFile = SynchronousFileSink(new File("classification.txt"), false)
+
+  val sinkWriteResult: Sink[TwoCategoryResult, Unit] = Flow[TwoCategoryResult]
+    .mapAsyncUnordered[ByteString](parallelism)(e =>
+      Future { ByteString.fromString(s"Article: ${e.article.title} " +
+      s"category: ${e.article.category} classification: ${e.classification} " +
+        s"positiveScore: ${e.positiveScore} negativeScore: ${e.negativeScore}\n"
+      )
+    }
+  ).to(sinkWriteFile)
 
   def main(args: Array[String]): Unit={
 
@@ -50,13 +86,40 @@ object Training {
 
     wordProbability(positivePath, negativePath).onComplete({
       case Success(value) => {
-        println(Console.GREEN + s" Total No. of Positive Sentences = ${value.totalPositiveObservation}" + Console.RESET)
-        println(Console.GREEN + s" Total No. of Negative Sentences = ${value.totalNegativeObservation}" + Console.RESET)
-        Files.write(Paths.get("result.txt"),
-          value.distribution.map(w => s"P(${w._1} in sentence) = ${w._2}").mkString("\n").getBytes()
-        )
-        actorSystem.terminate()
-        println(s"training completed in ${(System.currentTimeMillis()-startTimer)/1000.0} seconds")
+
+      println(Console.GREEN + s" Total No. of Positive Article = ${value.totalPositiveArticleObservation}" + Console.RESET)
+      println(Console.GREEN + s" Total No. of Negative Article = ${value.totalNegativeArticleObservation}" + Console.RESET)
+      println(Console.GREEN + s" Total No. of Positive Sentences = ${value.totalPositiveSentenceObservation}" + Console.RESET)
+      println(Console.GREEN + s" Total No. of Negative Sentences = ${value.totalNegativeSentenceObservation}" + Console.RESET)
+      println(s"training completed in ${(System.currentTimeMillis()-startTimer)/1000.0} seconds")
+
+//        val testArticles = Files.newDirectoryStream(Paths.get(negativePath)).iterator().asScala.map(_.toFile)
+//          .filter(_.getName=="9194")
+//          .map(f => Article.fromWikipediaHTML(f))
+//
+//        testArticles.collect({case Some(article) => article}).foreach(article => {
+//          println(s"classifying ${article.title}")
+//          value.classifyArticle(article, true)
+//        })
+//        actorSystem.terminate()
+
+
+        /**TRAINING ERROR**/
+        val trainingError = calculateError(value, positivePath, negativePath).run()
+        trainingError._1.onComplete({
+          case Success(errorTable) => {
+            println("training error")
+            println(errorTable.toString)
+            println("completed training error")
+            actorSystem.terminate()
+          }
+          case Failure(exception) => {
+            println(exception.getMessage)
+            actorSystem.terminate()
+          }
+        })
+
+        /** TEST ERROR **/
       }
       case Failure(throwable) => {
         println(Console.RED + throwable.getMessage + "\n" + throwable.getStackTrace.mkString("\n") + Console.RESET)

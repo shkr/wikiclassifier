@@ -4,7 +4,7 @@ import java.io.File
 import epic.preprocess.MLSentenceSegmenter
 import scala.util.matching.Regex
 
-case class Article(title: String, introduction: ArticleText, contentTypes: List[String], references: Set[String], label: Category)
+case class Article(title: String, introduction: ArticleText, contentTypes: List[String], references: Set[String], category: Category)
 
 object Article {
 
