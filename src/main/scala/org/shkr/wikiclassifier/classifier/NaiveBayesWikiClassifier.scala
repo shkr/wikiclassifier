@@ -16,17 +16,11 @@ class NaiveBayesWikiClassifier(positive: Category, negative: Category) {
    */
   var debug: Boolean = false
 
-  //Laplacian Smoothing
-  val laplaceFactor: Double = 0.0
-
   def logDebug(str: String): Unit={
     if(debug){
       println(str)
     }
   }
-
-  private def getEventCounter: mutable.HashMap[String, Int] =
-    new mutable.HashMap[String, Int]()  { override def default(key: String) = 1 }
 
   def validCategory(category: Category): Boolean = category==positive || category==negative
 
@@ -53,118 +47,35 @@ class NaiveBayesWikiClassifier(positive: Category, negative: Category) {
     }
   }
 
-  /** Content **/
-  val categoryBasedContentEventCounter: Map[Category, mutable.HashMap[String, Int]] = Map(
-    positive -> getEventCounter,
-    negative -> getEventCounter
-  )
+  val contentTypeClassifier = new NaiveBayesClassifier(positive, negative)
+  val titleClassifier = new NaiveBayesClassifier(positive, negative)
+  val introductionClassifier = new NaiveBayesClassifier(positive, negative)
 
-  def pWordInContentGivenCategory(word: String, category: Category): Double={
-    validCategory(category) match {
-      case true => {
-        val categoryEventCounter = categoryBasedContentEventCounter(category)
-        val totalCount: Double = if(category.equals(positive)){
-          totalPositiveArticleObservation
-        }  else {
-          totalNegativeArticleObservation
-        }
-
-        //logDebug(s"for word = $word the probability given category = $category is ${categoryEventCounter(word).toDouble / totalCount}")
-        (categoryEventCounter(word) + laplaceFactor)/ ((laplaceFactor + 1.0) * totalCount)
-      }
-      case false => 0
-    }
-  }
-
-  def pContentGivenCategory(article: Article, category: Category): Double={
-    article.contentTypes.flatMap(_.split(" ")).distinct.map(pWordInContentGivenCategory(_, category)).product
-  }
-
-  /** Title **/
-  val categoryBasedTitleEventCounter: Map[Category, mutable.HashMap[String, Int]] = Map(
-    positive -> getEventCounter,
-    negative -> getEventCounter
-  )
-
-  def pWordInTitleGivenCategory(word: String, category: Category): Double={
-    validCategory(category) match {
-      case true => {
-        val categoryEventCounter = categoryBasedTitleEventCounter(category)
-        val totalCount: Double = if(category.equals(positive)){
-          totalPositiveArticleObservation
-        }  else {
-          totalNegativeArticleObservation
-        }
-
-        //logDebug(s"for word = $word the probability given category = $category is ${categoryEventCounter(word).toDouble / totalCount}")
-
-        (categoryEventCounter(word) + laplaceFactor)/ ((laplaceFactor + 1.0) * totalCount)
-      }
-      case false => 0
+  def pContentTypeGivenCategory(article: Article, category: Category): Double={
+    val set: Set[String] = article.contentTypes.flatMap(_.split("\\s+")).toSet
+    contentTypeClassifier.pSentenceGivenCategory(set, category) match {
+      case 0 => 1
+      case x => x
     }
   }
 
   def pTitleGivenCategory(article: Article, category: Category): Double={
-    article.title.split(" ").distinct.map(pWordInTitleGivenCategory(_, category)).product
-  }
-
-  /** Sentence **/
-  var totalPositiveSentenceObservation: Long = 0
-  var totalNegativeSentenceObservation: Long = 0
-
-  val categoryBasedSentenceEventCounter: Map[Category, mutable.HashMap[String, Int]] = Map(
-    positive -> getEventCounter,
-    negative -> getEventCounter
-  )
-
-  def updateSentenceObservationCount(category: Category): Unit={
-    if(category.equals(positive)){
-      totalPositiveSentenceObservation +=1
-    } else if(category.equals(negative)){
-      totalNegativeSentenceObservation +=1
+    val set: Set[String] = article.title.split("\\s+").toSet
+    titleClassifier.pSentenceGivenCategory(set, category) match {
+      case 0 => 1
+      case x => x
     }
   }
 
-  def pCategoryForSentences(category: Category): Double={
-
-    if(category==positive){
-      totalPositiveSentenceObservation.toDouble/(totalNegativeSentenceObservation+ totalPositiveSentenceObservation)
-    } else if(category==negative){
-      totalNegativeSentenceObservation.toDouble/(totalNegativeSentenceObservation + totalPositiveSentenceObservation)
-    } else {
-      0.0
-    }
-  }
-  
-  def pWordInSentenceGivenCategory(word: String, category: Category): Double={
-    validCategory(category) match {
-      case true => {
-        val categoryEventCounter = categoryBasedSentenceEventCounter(category)
-        val totalCount: Double = if(category.equals(positive)){
-          totalPositiveSentenceObservation
-        }  else {
-          totalNegativeSentenceObservation
-        }
-
-        //logDebug(s"for word = $word the probability given category = $category is ${categoryEventCounter(word).toDouble / totalCount}")
-
-        (categoryEventCounter(word) + laplaceFactor)/ ((laplaceFactor + 1.0)*totalCount)
-      }
-      case false => 0
-    }
-  }
-
-  def pSentenceGivenCategory(sentence: IndexedSeq[String], category: Category): Double={
-    sentence.distinct.map(pWordInSentenceGivenCategory(_, category)).product
-  }
 
   def pIntroductionGivenCategory(article: Article, category: Category): Double={
+    /** We do not have all samples about the topic, so we make a Mean Estimate of the Disease Category for Each sentence **/
     if(article.introduction.sentences.nonEmpty){
       article.introduction.sentences
-        .map(sentence => pSentenceGivenCategory(sentence, category))
-        .sum / article.introduction.sentences.length
+        .map(sentence => introductionClassifier.pSentenceGivenCategory(sentence.toSet, category)).sum /
+          article.introduction.sentences.length
     } else {
-      0.0
+      1.0
     }
   }
 
@@ -177,21 +88,20 @@ class NaiveBayesWikiClassifier(positive: Category, negative: Category) {
         updateArticleObservationCount(article.category)
 
         //Update Content Observation
-        val categoryContentEventCounter = categoryBasedContentEventCounter(article.category)
-        article.contentTypes.flatMap(_.split(" ")).distinct.foreach(word => categoryContentEventCounter.update(word, categoryContentEventCounter(word) + 1))
+        val contentSet: Set[String] = article.contentTypes.flatMap(_.split("\\s+")).toSet
+        contentTypeClassifier.updateObservationCount(contentSet, article.category)
 
         //Update Title Observation
-        val categoryTitleEventCounter = categoryBasedTitleEventCounter(article.category)
-        article.title.split(" ").distinct.foreach(word => categoryTitleEventCounter.update(word, categoryTitleEventCounter(word) + 1))
+        val titleSet: Set[String] = article.title.split("\\s+").toSet
+        titleClassifier.updateObservationCount(titleSet, article.category)
 
         //Each Introduction has many Sentence Observation
-        val categorySentenceEventCounter = categoryBasedSentenceEventCounter(article.category)
+
         article.introduction.sentences.foreach(sentence => {
           //Update Sentence Observation
-          updateSentenceObservationCount(article.category)
-          sentence.distinct.foreach(word => categorySentenceEventCounter.update(word, categorySentenceEventCounter(word) + 1))
+          val sentenceSet: Set[String] = sentence.toSet
+          introductionClassifier.updateObservationCount(sentenceSet, article.category)
         })
-
       }
       case false => //DoNothing
     } 
@@ -202,13 +112,15 @@ class NaiveBayesWikiClassifier(positive: Category, negative: Category) {
 
     if(validCategory(category)){
       val pTitle = pTitleGivenCategory(article, category)
-      val pContent = pContentGivenCategory(article, category)
+      val pContentType = pContentTypeGivenCategory(article, category)
       val pIntro = pIntroductionGivenCategory(article, category)
+      val pCategory = pCategoryForArticle(category)
       logDebug(s"finding pTitle for article=${article.title} score=${pTitle}")
+      logDebug(s"finding pContentType for article=${article.title} score=${pContentType}")
       logDebug(s"finding pIntro for article=${article.title} score=${pIntro}")
-      pTitleGivenCategory(article, category) * pContent * pIntroductionGivenCategory(article, category) * pCategoryForArticle(category)
+      pTitle * pContentType * pIntro * pCategory
     } else {
-      0.0
+      Double.MinValue
     }
   }
 

@@ -90,8 +90,6 @@ object Training {
 
       println(Console.GREEN + s" Total No. of Positive Article = ${value.totalPositiveArticleObservation}" + Console.RESET)
       println(Console.GREEN + s" Total No. of Negative Article = ${value.totalNegativeArticleObservation}" + Console.RESET)
-      println(Console.GREEN + s" Total No. of Positive Sentences = ${value.totalPositiveSentenceObservation}" + Console.RESET)
-      println(Console.GREEN + s" Total No. of Negative Sentences = ${value.totalNegativeSentenceObservation}" + Console.RESET)
       println(s"training completed in ${(System.currentTimeMillis()-startTimer)/1000.0} seconds")
 
 //        val testArticles = Files.newDirectoryStream(Paths.get(negativePath)).iterator().asScala.map(_.toFile)
