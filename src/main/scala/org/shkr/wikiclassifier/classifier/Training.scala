@@ -9,6 +9,7 @@ import org.shkr.wikiclassifier.model._
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
+
 object Training {
 
   import org.shkr.wikiclassifier.Configuration._

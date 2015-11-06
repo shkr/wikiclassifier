@@ -17,7 +17,7 @@ class NaiveBayesWikiClassifier(positive: Category, negative: Category) {
   var debug: Boolean = false
 
   //Laplacian Smoothing
-  val laplaceFactor: Double = 1.0
+  val laplaceFactor: Double = 0.0
 
   def logDebug(str: String): Unit={
     if(debug){
@@ -26,7 +26,7 @@ class NaiveBayesWikiClassifier(positive: Category, negative: Category) {
   }
 
   private def getEventCounter: mutable.HashMap[String, Int] =
-    new mutable.HashMap[String, Int]()  { override def default(key: String) = 0 }
+    new mutable.HashMap[String, Int]()  { override def default(key: String) = 1 }
 
   def validCategory(category: Category): Boolean = category==positive || category==negative
 
@@ -37,7 +37,7 @@ class NaiveBayesWikiClassifier(positive: Category, negative: Category) {
   def pCategoryForArticle(category: Category): Double={
 
     if(category==positive){
-      totalPositiveArticleObservation.toDouble/(totalPositiveArticleObservation+ totalNegativeArticleObservation)
+      totalPositiveArticleObservation.toDouble/(totalPositiveArticleObservation + totalNegativeArticleObservation)
     } else if(category==negative){
       totalNegativeArticleObservation.toDouble/(totalNegativeArticleObservation + totalPositiveArticleObservation)
     } else {
@@ -77,7 +77,7 @@ class NaiveBayesWikiClassifier(positive: Category, negative: Category) {
   }
 
   def pContentGivenCategory(article: Article, category: Category): Double={
-    article.contentTypes.flatMap(_.split(" ")).distinct.map(pWordInContentGivenCategory(_, category)).product * pCategoryForArticle(category)
+    article.contentTypes.flatMap(_.split(" ")).distinct.map(pWordInContentGivenCategory(_, category)).product
   }
 
   /** Title **/
@@ -105,7 +105,7 @@ class NaiveBayesWikiClassifier(positive: Category, negative: Category) {
   }
 
   def pTitleGivenCategory(article: Article, category: Category): Double={
-    article.title.split(" ").distinct.map(pWordInTitleGivenCategory(_, category)).product * pCategoryForArticle(category)
+    article.title.split(" ").distinct.map(pWordInTitleGivenCategory(_, category)).product
   }
 
   /** Sentence **/
@@ -160,9 +160,9 @@ class NaiveBayesWikiClassifier(positive: Category, negative: Category) {
 
   def pIntroductionGivenCategory(article: Article, category: Category): Double={
     if(article.introduction.sentences.nonEmpty){
-      (article.introduction.sentences
+      article.introduction.sentences
         .map(sentence => pSentenceGivenCategory(sentence, category))
-        .sum / article.introduction.sentences.length)*pCategoryForSentences(positive)
+        .sum / article.introduction.sentences.length
     } else {
       0.0
     }
@@ -206,7 +206,7 @@ class NaiveBayesWikiClassifier(positive: Category, negative: Category) {
       val pIntro = pIntroductionGivenCategory(article, category)
       logDebug(s"finding pTitle for article=${article.title} score=${pTitle}")
       logDebug(s"finding pIntro for article=${article.title} score=${pIntro}")
-      pTitleGivenCategory(article, category) * pContent * pIntroductionGivenCategory(article, category)
+      pTitleGivenCategory(article, category) * pContent * pIntroductionGivenCategory(article, category) * pCategoryForArticle(category)
     } else {
       0.0
     }

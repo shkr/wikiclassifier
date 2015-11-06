@@ -2,7 +2,7 @@ package org.shkr.wikiclassifier.model
 
 import scala.collection.mutable
 
-case class TwoCategoryResult(classification: Category, article: Article, positiveScore: Double, negativeScore: Double)
+case class TwoCategoryResult(classification: Category, article: Article, positiveScore: BigDecimal, negativeScore: BigDecimal)
 
 sealed trait StatisticalError
 
@@ -39,6 +39,8 @@ class StatisticalErrorTable(positive: Category, negative: Category) {
     s"FP  = ${map(FalsePositive).toDouble/totalCount} \n" +
     s"TN  = ${map(TrueNegative).toDouble/totalCount} \n" +
     s"FN  = ${map(FalseNegative).toDouble/totalCount} \n" +
+    s"TPR = ${map(TruePositive).toDouble/(map(TruePositive) + map(FalseNegative)).toDouble} \n" +
+    s"TNR = ${map(TrueNegative).toDouble/(map(TrueNegative) + map(FalsePositive)).toDouble} \n" +
     s"PPV = ${map(TruePositive).toDouble/(map(TruePositive) + map(FalsePositive)).toDouble} \n" +
     s"NPV = ${map(TrueNegative).toDouble/(map(TrueNegative) + map(FalseNegative)).toDouble}"
   }
