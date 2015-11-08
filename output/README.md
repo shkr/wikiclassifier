@@ -1,0 +1,1 @@
+This directory contains the output files written by the Training object
