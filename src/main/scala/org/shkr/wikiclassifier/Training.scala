@@ -8,6 +8,7 @@ import akka.stream.io.SynchronousFileSink
 import akka.stream.scaladsl._
 import akka.util.ByteString
 import org.shkr.actors.util.sampler.Select
+import org.shkr.wikiclassifier.classifier.NaiveBayesWikiClassifier
 import org.shkr.wikiclassifier.model._
 import play.api.libs.json.Json
 import scala.collection.JavaConverters._

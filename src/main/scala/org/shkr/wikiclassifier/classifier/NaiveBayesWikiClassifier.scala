@@ -1,7 +1,7 @@
-package org.shkr.wikiclassifier
+package org.shkr.wikiclassifier.classifier
 
-import org.shkr.wikiclassifier.model.{Disease, Article, Category, TwoCategoryResult}
-import play.api.libs.json.{Json, JsValue}
+import org.shkr.wikiclassifier.model.{Article, Category, Disease, TwoCategoryResult}
+import play.api.libs.json.{JsValue, Json}
 
 import scala.collection.mutable
 
