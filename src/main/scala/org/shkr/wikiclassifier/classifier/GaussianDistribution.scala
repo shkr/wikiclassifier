@@ -13,16 +13,7 @@ class GaussianDistribution(d: Int) {
    * class 1..K and provide then use it to
    * classify the category for an unknown sample (x')
    * 
-   * We will use this here to predict the relationship between the number of references and the
-   * number of lines in each wikipedia article.
-   * We will divide the articles into categories
-   * 0-3 references
-   * 3-6 references
-   * 7-9 references
-   * 9-12 references
-   * 12-15 references
-   * 15+ references
-   * The range length of 3 has been arbitrary selected
+   * We will use this to classify section names by the content length for disease articles
    */
   private var samples: scala.collection.mutable.ListBuffer[Array[Int]] = ListBuffer[Array[Int]]()
 
@@ -43,8 +34,21 @@ class GaussianDistribution(d: Int) {
    * If std_dev is not provided we assume it to be 1.0
    * @return
    */
-  def approximateMean(stdDev: BigDecimal = 1.0): Array[BigDecimal]={
-    Array()
+  def approximateMean: Array[BigDecimal]={
+
   }
 
+  /**
+   * Solve the Maximum Likelihood for mean which maximizes
+   * L(stdDev) = P(S| stdDev) = P(x1, x2, x3, .... | stdDev)
+   * We can assume that each sample was Independently picked from an Identical Distribution
+   * The biased estimate of solving L'(stdDev) = d P(S| stdDev) / dstdDev = 0
+   * is (1 - 1/n)sumOf(x_i - u)^T(x_i -u) for i=1 ...n
+   * The unbiased version is
+   * 1/(n-1)sumOf(x_i - u)^T(x_i -u) for i=1 ...n
+   * @return
+   */
+  def approximateStdDev: Array[BigDecimal]={
+
+  }
 }
