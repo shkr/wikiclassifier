@@ -3,16 +3,12 @@ package org.shkr.wikiclassifier
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Paths, Files}
-
 import akka.stream.io.SynchronousFileSink
 import akka.stream.scaladsl._
 import akka.util.ByteString
-import org.shkr.wikiclassifier.classifier.NaiveBayesWikiClassifier
 import org.shkr.wikiclassifier.model._
 import play.api.libs.json.Json
-
 import scala.concurrent.Future
-
 /**
  * Classify SectionName using the length of the text
  */

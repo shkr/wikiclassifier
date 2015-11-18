@@ -30,8 +30,11 @@ class GaussianDistribution(val covariance: BigDecimal = 1.0) {
   }
 
   /** Add Sample**/
-  def addSample(x: BigDecimal): Unit={
-    samples += x
+  def addSample(x: List[BigDecimal]): Unit={
+    samples ++= x
+
+    //Update Bayesian Estimate
+    bayesianLearningEstimate(x)
   }
 
   /**
@@ -43,7 +46,7 @@ class GaussianDistribution(val covariance: BigDecimal = 1.0) {
    * We estimate the mean by Maximum Likelihood
    * @return meanEstimate
    */
-  def maximizeLikelihoodParameters(newSamples: List[BigDecimal]): (BigDecimal, BigDecimal)={
+  def maximizeLikelihoodParameters(newSamples: List[BigDecimal]): BigDecimal={
     //Add Samples
     samples ++= newSamples
 
@@ -52,12 +55,7 @@ class GaussianDistribution(val covariance: BigDecimal = 1.0) {
     var sum: BigDecimal = 0.0
     samples.foreach(x => {sum+=x; size+=1})
 
-    val mean: BigDecimal = sum/size
-
-    //Maximum Likelihood estimate of sample covariance
-    val covariance = samples.map(x => (x-mean)*(x-mean)).sum/(size - 1)
-
-    (mean, covariance)
+    sum/size
   }
 
   /**
